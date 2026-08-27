@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>School Bell System - Dashboard</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-logo">
+                <i class="ri-bell-ringing-line"></i>
+            </div>
+            <h1>School Bell System</h1>
+            <p>Sign in to manage your school bell schedules</p>
+            <button id="googleSignIn" class="google-btn">
+                <i class="ri-google-fill"></i>
+                Sign in with Google
+            </button>
+            <div id="loginError" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard" style="display: none;">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1><i class="ri-bell-ringing-line"></i> Bell System</h1>
+            </div>
+            <div class="header-right">
+                <span id="userEmail" class="user-email"></span>
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="ri-logout-box-r-line"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="days-grid" id="daysGrid">
+                <!-- Day cards will be inserted here -->
+            </div>
+        </main>
+
+        <!-- Period Modal -->
+        <div id="periodModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Periods</h2>
+                    <button class="close-modal" onclick="closePeriodModal()">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="period-actions">
+                        <button id="addPeriodBtn" class="add-btn">
+                            <i class="ri-add-line"></i> Add Period
+                        </button>
+                    </div>
+                    <div id="periodsList" class="periods-list">
+                        <!-- Periods will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Period Modal -->
+        <div id="periodFormModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="periodFormTitle">Add Period</h2>
+                    <button class="close-modal" onclick="closePeriodForm()">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="periodForm" onsubmit="savePeriod(event)">
+                        <input type="hidden" id="periodId">
+                        <input type="hidden" id="currentDay">
+                        <div class="form-group">
+                            <label for="periodName">Period Name</label>
+                            <input type="text" id="periodName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="periodFrom">From Time</label>
+                            <input type="time" id="periodFrom" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="periodTo">To Time</label>
+                            <input type="time" id="periodTo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="bellDuration">Bell Duration (seconds)</label>
+                            <input type="number" id="bellDuration" min="1" max="30" value="3" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="cancel-btn" onclick="closePeriodForm()">Cancel</button>
+                            <button type="submit" class="save-btn">Save Period</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
