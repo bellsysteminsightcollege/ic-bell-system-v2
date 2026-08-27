@@ -1,10 +1,10 @@
 // Configuration
 const CONFIG = {
-    CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
-    API_KEY: 'YOUR_GOOGLE_API_KEY',
+    CLIENT_ID: '1023743946723-vpp75o0it26q56tjrirmekntjslqg6gd.apps.googleusercontent.com',
+    API_KEY: 'AIzaSyDdEL_pcBrMGM209ulzuoI0kJEUvvlTniU',
     SCOPES: 'https://www.googleapis.com/auth/spreadsheets',
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
-    ADMIN_EMAIL: 'admin@school.com'
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzoukmjSa6nVRiuJaICCxaFO4hwJHAXiwSANoCp3OO-hWI3KJ3QvfRQD2seY1IykGdkJQ/exec',
+    ADMIN_EMAIL: 'bellsystem.insightcollege@gmail.com'
 };
 
 // State
