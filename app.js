@@ -11,6 +11,8 @@ const CONFIG = {
 let currentUser = null;
 let currentDay = null;
 let daysStatus = {};
+let isGoogleAuthReady = false;
+let auth2 = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,13 +20,47 @@ document.addEventListener('DOMContentLoaded', () => {
     checkLoginStatus();
 });
 
-// Google Auth
+// Google Auth Initialization
 function initializeGoogleAuth() {
+    // Load the Google API client library
+    const script = document.createElement('script');
+    script.src = 'https://apis.google.com/js/platform.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        initializeGoogleAuth2();
+    };
+    document.head.appendChild(script);
+}
+
+function initializeGoogleAuth2() {
     gapi.load('auth2', () => {
         gapi.auth2.init({
             client_id: CONFIG.CLIENT_ID,
-            scope: CONFIG.SCOPES
-        });
+            scope: CONFIG.SCOPES,
+            fetch_basic_profile: true
+        }).then(
+            (authInstance) => {
+                auth2 = authInstance;
+                isGoogleAuthReady = true;
+                console.log('Google Auth initialized successfully');
+
+                // Check if user is already signed in
+                if (auth2.isSignedIn.get()) {
+                    const googleUser = auth2.currentUser.get();
+                    const profile = googleUser.getBasicProfile();
+                    const user = {
+                        email: profile.getEmail(),
+                        name: profile.getName()
+                    };
+                    authenticateUser(user);
+                }
+            },
+            (error) => {
+                console.error('Google Auth initialization failed:', error);
+                showLoginError('Failed to initialize Google Sign-In. Please refresh the page.');
+            }
+        );
     });
 }
 
@@ -38,23 +74,76 @@ function checkLoginStatus() {
     }
 }
 
-document.getElementById('googleSignIn').addEventListener('click', () => {
-    const auth2 = gapi.auth2.getAuthInstance();
-    auth2.signIn().then(googleUser => {
+// Google Sign-In Button Handler
+document.getElementById('googleSignIn').addEventListener('click', async () => {
+    try {
+        // Check if Google Auth is ready
+        if (!isGoogleAuthReady || !auth2) {
+            showLoginError('Google Sign-In is still loading. Please wait a moment and try again.');
+            return;
+        }
+
+        // Clear any previous errors
+        document.getElementById('loginError').style.display = 'none';
+
+        // Show loading state
+        const signInBtn = document.getElementById('googleSignIn');
+        signInBtn.disabled = true;
+        signInBtn.innerHTML = '<i class="ri-loader-4-line"></i> Signing in...';
+
+        // Sign in with Google
+        const googleUser = await auth2.signIn({
+            prompt: 'select_account'
+        });
+
         const profile = googleUser.getBasicProfile();
         const user = {
             email: profile.getEmail(),
-            name: profile.getName()
+            name: profile.getName(),
+            id: googleUser.getId()
         };
 
-        authenticateUser(user);
-    }).catch(error => {
-        showLoginError('Sign in failed. Please try again.');
-    });
+        console.log('Google Sign-In successful:', user.email);
+
+        // Authenticate with our backend
+        await authenticateUser(user);
+
+        // Reset button state
+        signInBtn.disabled = false;
+        signInBtn.innerHTML = '<i class="ri-google-fill"></i> Sign in with Google';
+
+    } catch (error) {
+        console.error('Sign-in error:', error);
+
+        // Reset button state
+        const signInBtn = document.getElementById('googleSignIn');
+        signInBtn.disabled = false;
+        signInBtn.innerHTML = '<i class="ri-google-fill"></i> Sign in with Google';
+
+        // Show appropriate error message
+        if (error.error === 'popup_closed_by_user') {
+            showLoginError('Sign-in cancelled. Please try again.');
+        } else if (error.error === 'access_denied') {
+            showLoginError('Access denied. You must use the admin account.');
+        } else {
+            showLoginError('Sign in failed. Please try again.');
+        }
+    }
 });
 
 async function authenticateUser(user) {
     try {
+        // First check if this is the admin email
+        if (user.email.toLowerCase() !== CONFIG.ADMIN_EMAIL.toLowerCase()) {
+            showLoginError('Access denied. This account is not authorized as admin.');
+            // Sign out the unauthorized user
+            if (auth2) {
+                await auth2.signOut();
+            }
+            return;
+        }
+
+        // Verify with backend
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
             headers: {
@@ -69,13 +158,18 @@ async function authenticateUser(user) {
         const data = await response.json();
 
         if (data.isAdmin) {
+            // Save user to localStorage
             localStorage.setItem('bellSystemUser', JSON.stringify(user));
             showDashboard(user);
         } else {
             showLoginError('Access denied. Admin access only.');
+            if (auth2) {
+                await auth2.signOut();
+            }
         }
     } catch (error) {
-        showLoginError('Authentication failed. Please try again.');
+        console.error('Authentication error:', error);
+        showLoginError('Authentication failed. Please check your connection and try again.');
     }
 }
 
@@ -83,6 +177,11 @@ function showLoginError(message) {
     const errorDiv = document.getElementById('loginError');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
+
+    // Auto-hide error after 5 seconds
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
 }
 
 function showDashboard(user) {
@@ -94,17 +193,34 @@ function showDashboard(user) {
     loadDays();
 }
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    const auth2 = gapi.auth2.getAuthInstance();
-    auth2.signOut().then(() => {
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+        // Sign out from Google
+        if (auth2 && isGoogleAuthReady) {
+            await auth2.signOut();
+            await auth2.disconnect();
+        }
+
+        // Clear local storage
         localStorage.removeItem('bellSystemUser');
-        location.reload();
-    });
+
+        // Reload page
+        window.location.reload();
+    } catch (error) {
+        console.error('Logout error:', error);
+        // Force logout even if Google sign-out fails
+        localStorage.removeItem('bellSystemUser');
+        window.location.reload();
+    }
 });
 
 // Load Days
 async function loadDays() {
     try {
+        // Show loading state
+        const daysGrid = document.getElementById('daysGrid');
+        daysGrid.innerHTML = '<div class="loading-spinner"></div>';
+
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
             headers: {
@@ -120,9 +236,14 @@ async function loadDays() {
         if (data.success) {
             daysStatus = data.days;
             renderDays();
+        } else {
+            console.error('Failed to load days:', data.error);
+            daysGrid.innerHTML = '<p>Failed to load days. Please refresh the page.</p>';
         }
     } catch (error) {
         console.error('Failed to load days:', error);
+        const daysGrid = document.getElementById('daysGrid');
+        daysGrid.innerHTML = '<p>Failed to load days. Please check your connection.</p>';
     }
 }
 
@@ -163,6 +284,10 @@ async function toggleDay(dayName, event) {
     event.stopPropagation();
 
     try {
+        // Optimistic UI update
+        daysStatus[dayName] = !daysStatus[dayName];
+        renderDays();
+
         const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
             method: 'POST',
             headers: {
@@ -172,16 +297,22 @@ async function toggleDay(dayName, event) {
                 action: 'toggleDay',
                 email: currentUser.email,
                 dayName: dayName,
-                enabled: !daysStatus[dayName]
+                enabled: daysStatus[dayName]
             })
         });
 
         const data = await response.json();
-        if (data.success) {
-            await loadDays();
+        if (!data.success) {
+            // Revert on failure
+            daysStatus[dayName] = !daysStatus[dayName];
+            renderDays();
+            console.error('Failed to toggle day:', data.error);
         }
     } catch (error) {
         console.error('Failed to toggle day:', error);
+        // Revert on error
+        daysStatus[dayName] = !daysStatus[dayName];
+        renderDays();
     }
 }
 
@@ -214,10 +345,13 @@ async function loadPeriods(dayName) {
         const data = await response.json();
         if (data.success) {
             renderPeriods(data.periods);
+        } else {
+            periodsList.innerHTML = '<p>Failed to load periods</p>';
+            console.error('Failed to load periods:', data.error);
         }
     } catch (error) {
         console.error('Failed to load periods:', error);
-        periodsList.innerHTML = '<p>Failed to load periods</p>';
+        periodsList.innerHTML = '<p>Failed to load periods. Please check your connection.</p>';
     }
 }
 
@@ -314,9 +448,12 @@ async function savePeriod(event) {
         if (data.success) {
             closePeriodForm();
             await loadPeriods(dayName);
+        } else {
+            alert('Failed to save period: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Failed to save period:', error);
+        alert('Failed to save period. Please check your connection.');
     }
 }
 
@@ -342,8 +479,24 @@ async function deletePeriod(periodId) {
         const data = await response.json();
         if (data.success) {
             await loadPeriods(currentDay);
+        } else {
+            alert('Failed to delete period: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
         console.error('Failed to delete period:', error);
+        alert('Failed to delete period. Please check your connection.');
+    }
+}
+
+// Close modals when clicking outside
+window.onclick = function (event) {
+    const periodModal = document.getElementById('periodModal');
+    const periodFormModal = document.getElementById('periodFormModal');
+
+    if (event.target === periodModal) {
+        closePeriodModal();
+    }
+    if (event.target === periodFormModal) {
+        closePeriodForm();
     }
 }
