@@ -1,502 +1,340 @@
 // Configuration
-const CONFIG = {
-    CLIENT_ID: '1023743946723-vpp75o0it26q56tjrirmekntjslqg6gd.apps.googleusercontent.com',
-    API_KEY: 'AIzaSyDdEL_pcBrMGM209ulzuoI0kJEUvvlTniU',
-    SCOPES: 'https://www.googleapis.com/auth/spreadsheets',
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzoukmjSa6nVRiuJaICCxaFO4hwJHAXiwSANoCp3OO-hWI3KJ3QvfRQD2seY1IykGdkJQ/exec',
-    ADMIN_EMAIL: 'bellsystem.insightcollege@gmail.com'
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgzQuHcMe7OSdr1_UXhcAqKcHR7WuZzavrqsRTPypEokypy_lmLHnEcF6e5PEf-ivkYQ/exec';
+const GOOGLE_CLIENT_ID = '1023743946723-vpp75o0it26q56tjrirmekntjslqg6gd.apps.googleusercontent.com';
+const ADMIN_EMAIL = 'bellsystem.insightcollege@gmail.com';
+
+let idToken = null;
+let userEmail = null;
+let daysSchedule = {
+    "Monday": { enabled: false, periods: [] },
+    "Tuesday": { enabled: false, periods: [] },
+    "Wednesday": { enabled: false, periods: [] },
+    "Thursday": { enabled: false, periods: [] },
+    "Friday": { enabled: false, periods: [] },
+    "Saturday": { enabled: false, periods: [] },
+    "Sunday": { enabled: false, periods: [] },
+    "Special Day": { enabled: false, periods: [] }
 };
+let isExamMode = false;
+let expandedDay = null;
+let deferredPrompt = null;
 
-// State
-let currentUser = null;
-let currentDay = null;
-let daysStatus = {};
-let isGoogleAuthReady = false;
-let auth2 = null;
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    initializeGoogleAuth();
-    checkLoginStatus();
-});
-
-// Google Auth Initialization
-function initializeGoogleAuth() {
-    // Load the Google API client library
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/platform.js';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-        initializeGoogleAuth2();
-    };
-    document.head.appendChild(script);
-}
-
-function initializeGoogleAuth2() {
-    gapi.load('auth2', () => {
-        gapi.auth2.init({
-            client_id: CONFIG.CLIENT_ID,
-            scope: CONFIG.SCOPES,
-            fetch_basic_profile: true
-        }).then(
-            (authInstance) => {
-                auth2 = authInstance;
-                isGoogleAuthReady = true;
-                console.log('Google Auth initialized successfully');
-
-                // Check if user is already signed in
-                if (auth2.isSignedIn.get()) {
-                    const googleUser = auth2.currentUser.get();
-                    const profile = googleUser.getBasicProfile();
-                    const user = {
-                        email: profile.getEmail(),
-                        name: profile.getName()
-                    };
-                    authenticateUser(user);
-                }
-            },
-            (error) => {
-                console.error('Google Auth initialization failed:', error);
-                showLoginError('Failed to initialize Google Sign-In. Please refresh the page.');
-            }
-        );
+// Google Identity Services initialization
+function initGoogleAuth() {
+    google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse
     });
+    google.accounts.id.renderButton(
+        document.getElementById('googleLoginBtn'),
+        { theme: 'outline', size: 'large' }
+    );
 }
 
-function checkLoginStatus() {
-    const savedUser = localStorage.getItem('bellSystemUser');
-    if (savedUser) {
-        const user = JSON.parse(savedUser);
-        if (user.email === CONFIG.ADMIN_EMAIL) {
-            showDashboard(user);
-        }
-    }
-}
-
-// Google Sign-In Button Handler
-document.getElementById('googleSignIn').addEventListener('click', async () => {
-    try {
-        // Check if Google Auth is ready
-        if (!isGoogleAuthReady || !auth2) {
-            showLoginError('Google Sign-In is still loading. Please wait a moment and try again.');
-            return;
-        }
-
-        // Clear any previous errors
-        document.getElementById('loginError').style.display = 'none';
-
-        // Show loading state
-        const signInBtn = document.getElementById('googleSignIn');
-        signInBtn.disabled = true;
-        signInBtn.innerHTML = '<i class="ri-loader-4-line"></i> Signing in...';
-
-        // Sign in with Google
-        const googleUser = await auth2.signIn({
-            prompt: 'select_account'
-        });
-
-        const profile = googleUser.getBasicProfile();
-        const user = {
-            email: profile.getEmail(),
-            name: profile.getName(),
-            id: googleUser.getId()
-        };
-
-        console.log('Google Sign-In successful:', user.email);
-
-        // Authenticate with our backend
-        await authenticateUser(user);
-
-        // Reset button state
-        signInBtn.disabled = false;
-        signInBtn.innerHTML = '<i class="ri-google-fill"></i> Sign in with Google';
-
-    } catch (error) {
-        console.error('Sign-in error:', error);
-
-        // Reset button state
-        const signInBtn = document.getElementById('googleSignIn');
-        signInBtn.disabled = false;
-        signInBtn.innerHTML = '<i class="ri-google-fill"></i> Sign in with Google';
-
-        // Show appropriate error message
-        if (error.error === 'popup_closed_by_user') {
-            showLoginError('Sign-in cancelled. Please try again.');
-        } else if (error.error === 'access_denied') {
-            showLoginError('Access denied. You must use the admin account.');
-        } else {
-            showLoginError('Sign in failed. Please try again.');
-        }
-    }
-});
-
-async function authenticateUser(user) {
-    try {
-        // First check if this is the admin email
-        if (user.email.toLowerCase() !== CONFIG.ADMIN_EMAIL.toLowerCase()) {
-            showLoginError('Access denied. This account is not authorized as admin.');
-            // Sign out the unauthorized user
-            if (auth2) {
-                await auth2.signOut();
-            }
-            return;
-        }
-
-        // Verify with backend
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'authenticate',
-                email: user.email
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.isAdmin) {
-            // Save user to localStorage
-            localStorage.setItem('bellSystemUser', JSON.stringify(user));
-            showDashboard(user);
-        } else {
-            showLoginError('Access denied. Admin access only.');
-            if (auth2) {
-                await auth2.signOut();
-            }
-        }
-    } catch (error) {
-        console.error('Authentication error:', error);
-        showLoginError('Authentication failed. Please check your connection and try again.');
-    }
-}
-
-function showLoginError(message) {
-    const errorDiv = document.getElementById('loginError');
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
-
-    // Auto-hide error after 5 seconds
-    setTimeout(() => {
-        errorDiv.style.display = 'none';
-    }, 5000);
-}
-
-function showDashboard(user) {
-    currentUser = user;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('userEmail').textContent = user.email;
-
-    loadDays();
-}
-
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-    try {
-        // Sign out from Google
-        if (auth2 && isGoogleAuthReady) {
-            await auth2.signOut();
-            await auth2.disconnect();
-        }
-
-        // Clear local storage
-        localStorage.removeItem('bellSystemUser');
-
-        // Reload page
-        window.location.reload();
-    } catch (error) {
-        console.error('Logout error:', error);
-        // Force logout even if Google sign-out fails
-        localStorage.removeItem('bellSystemUser');
-        window.location.reload();
-    }
-});
-
-// Load Days
-async function loadDays() {
-    try {
-        // Show loading state
-        const daysGrid = document.getElementById('daysGrid');
-        daysGrid.innerHTML = '<div class="loading-spinner"></div>';
-
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'getDaysStatus',
-                email: currentUser.email
-            })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            daysStatus = data.days;
-            renderDays();
-        } else {
-            console.error('Failed to load days:', data.error);
-            daysGrid.innerHTML = '<p>Failed to load days. Please refresh the page.</p>';
-        }
-    } catch (error) {
-        console.error('Failed to load days:', error);
-        const daysGrid = document.getElementById('daysGrid');
-        daysGrid.innerHTML = '<p>Failed to load days. Please check your connection.</p>';
-    }
-}
-
-function renderDays() {
-    const daysGrid = document.getElementById('daysGrid');
-    daysGrid.innerHTML = '';
-
-    const dayIcons = {
-        'Monday': 'ri-calendar-line',
-        'Tuesday': 'ri-calendar-2-line',
-        'Wednesday': 'ri-calendar-3-line',
-        'Thursday': 'ri-calendar-4-line',
-        'Friday': 'ri-calendar-5-line',
-        'Saturday': 'ri-calendar-6-line',
-        'Sunday': 'ri-calendar-7-line',
-        'Special Day': 'ri-star-line'
-    };
-
-    Object.keys(dayIcons).forEach(dayName => {
-        const isActive = daysStatus[dayName];
-        const card = document.createElement('div');
-        card.className = `day-card ${isActive ? 'active' : 'disabled'}`;
-        card.innerHTML = `
-            <div class="day-icon">
-                <i class="${dayIcons[dayName]}"></i>
-            </div>
-            <div class="day-name">${dayName}</div>
-            <div class="toggle-switch ${isActive ? 'active' : ''}" onclick="toggleDay('${dayName}', event)">
-                <div class="toggle-slider"></div>
-            </div>
-        `;
-        card.onclick = () => openPeriods(dayName);
-        daysGrid.appendChild(card);
-    });
-}
-
-async function toggleDay(dayName, event) {
-    event.stopPropagation();
-
-    try {
-        // Optimistic UI update
-        daysStatus[dayName] = !daysStatus[dayName];
-        renderDays();
-
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'toggleDay',
-                email: currentUser.email,
-                dayName: dayName,
-                enabled: daysStatus[dayName]
-            })
-        });
-
-        const data = await response.json();
-        if (!data.success) {
-            // Revert on failure
-            daysStatus[dayName] = !daysStatus[dayName];
-            renderDays();
-            console.error('Failed to toggle day:', data.error);
-        }
-    } catch (error) {
-        console.error('Failed to toggle day:', error);
-        // Revert on error
-        daysStatus[dayName] = !daysStatus[dayName];
-        renderDays();
-    }
-}
-
-// Open Periods
-async function openPeriods(dayName) {
-    currentDay = dayName;
-    document.getElementById('modalTitle').textContent = `${dayName} Periods`;
-    document.getElementById('periodModal').style.display = 'flex';
-
-    await loadPeriods(dayName);
-}
-
-async function loadPeriods(dayName) {
-    const periodsList = document.getElementById('periodsList');
-    periodsList.innerHTML = '<div class="loading-spinner"></div>';
-
-    try {
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'getPeriods',
-                email: currentUser.email,
-                dayName: dayName
-            })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            renderPeriods(data.periods);
-        } else {
-            periodsList.innerHTML = '<p>Failed to load periods</p>';
-            console.error('Failed to load periods:', data.error);
-        }
-    } catch (error) {
-        console.error('Failed to load periods:', error);
-        periodsList.innerHTML = '<p>Failed to load periods. Please check your connection.</p>';
-    }
-}
-
-function renderPeriods(periods) {
-    const periodsList = document.getElementById('periodsList');
-
-    if (periods.length === 0) {
-        periodsList.innerHTML = '<p>No periods found for this day</p>';
+function handleCredentialResponse(response) {
+    idToken = response.credential;
+    // Decode JWT to get email (simple)
+    const payload = JSON.parse(atob(idToken.split('.')[1]));
+    userEmail = payload.email;
+    if (userEmail !== ADMIN_EMAIL) {
+        alert('Access denied. Only admin can log in.');
+        google.accounts.id.disableAutoSelect();
         return;
     }
+    // Show dashboard
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadAllData();
+}
 
-    periodsList.innerHTML = periods.map(period => `
-        <div class="period-card">
-            <div class="period-info">
-                <div class="period-name">${period.name}</div>
-                <div class="period-time">${period.from} - ${period.to}</div>
-                <div class="period-id">ID: ${period.periodId}</div>
-                <div class="period-id">Bell: ${period.bellDuration || 3}s</div>
+// Logout
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    idToken = null;
+    userEmail = null;
+    google.accounts.id.disableAutoSelect();
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+});
+
+// Generic API call to Apps Script
+async function apiCall(action, method = 'GET', body = null) {
+    let url = `${APPS_SCRIPT_URL}?action=${action}&token=${idToken}`;
+    const options = { method: method };
+    if (method === 'POST' && body) {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(body);
+    }
+    const response = await fetch(url, options);
+    return await response.json();
+}
+
+// Load all data (day statuses and periods)
+async function loadAllData() {
+    try {
+        // Fetch all day statuses
+        const statusRes = await apiCall('getAllDaysStatus');
+        if (statusRes.success) {
+            for (let day in daysSchedule) {
+                daysSchedule[day].enabled = statusRes.status[day] || false;
+            }
+        }
+        // Fetch periods for each day
+        for (let day of Object.keys(daysSchedule)) {
+            const dayRes = await apiCall('getDay', 'GET', null, { day: day });
+            if (dayRes.success) {
+                daysSchedule[day].periods = dayRes.periods;
+                daysSchedule[day].enabled = dayRes.enabled;
+            }
+        }
+        initializeDays();
+        updatePeriodsCount();
+        calculateNextBell();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        alert('Failed to load data. Please try again.');
+    }
+}
+
+// Initialize day cards
+function initializeDays() {
+    const scheduleList = document.getElementById('scheduleList');
+    scheduleList.innerHTML = '';
+    Object.keys(daysSchedule).forEach(dayName => {
+        const dayCard = createDayCard(dayName);
+        scheduleList.appendChild(dayCard);
+    });
+}
+
+// Create day card
+function createDayCard(dayName) {
+    const day = daysSchedule[dayName];
+    const periodCount = day.periods.length;
+    const dayCard = document.createElement('div');
+    dayCard.className = `day-card ${day.enabled ? 'active' : ''} ${isExamMode && dayName === 'Special Day' ? 'exam-mode' : ''}`;
+    dayCard.id = `day-${dayName.replace(/\s+/g, '-').toLowerCase()}`;
+    dayCard.innerHTML = `
+        <div class="day-header" onclick="toggleDayExpansion('${dayName}')">
+            <div class="day-info">
+                <i class="ri-arrow-right-s-fill day-icon"></i>
+                <span class="day-title">${dayName}</span>
+                <span class="period-count">${periodCount} period${periodCount !== 1 ? 's' : ''}</span>
             </div>
-            <div class="period-actions-btns">
-                <button class="edit-btn" onclick="editPeriod('${period.periodId}', '${period.name}', '${period.from}', '${period.to}', ${period.bellDuration || 3})">
-                    <i class="ri-edit-line"></i>
+            <div class="day-toggle">
+                <label class="toggle-switch">
+                    <input type="checkbox" ${day.enabled ? 'checked' : ''} onchange="toggleDay('${dayName}', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <button class="add-period-btn" onclick="openAddPeriodModal('${dayName}')">
+                    <i class="ri-apps-2-add-fill"></i>
                 </button>
-                <button class="delete-btn" onclick="deletePeriod('${period.periodId}')">
-                    <i class="ri-delete-bin-line"></i>
+            </div>
+        </div>
+        <div class="periods-container">
+            ${renderPeriodsForDay(dayName)}
+        </div>
+    `;
+    return dayCard;
+}
+
+// Render periods for a day
+function renderPeriodsForDay(dayName) {
+    const periods = daysSchedule[dayName].periods;
+    if (periods.length === 0) {
+        return '<div class="no-periods">No periods added</div>';
+    }
+    return periods.map((period, index) => `
+        <div class="period-item">
+            <div class="period-info">
+                <h4>${period.name}</h4>
+                <div class="period-time">
+                    <i class="far fa-clock"></i> ${period.startTime} - ${period.endTime}
+                    <span class="duration">(${period.bellDuration}s bell)</span>
+                </div>
+            </div>
+            <div class="period-actions">
+                <button class="btn delete-period-btn" onclick="deletePeriod('${dayName}', '${period.periodId}')">
+                    <i class="fas fa-trash"></i>
                 </button>
             </div>
         </div>
     `).join('');
 }
 
-function closePeriodModal() {
-    document.getElementById('periodModal').style.display = 'none';
+// Toggle day expansion
+function toggleDayExpansion(dayName) {
+    const dayCard = document.getElementById(`day-${dayName.replace(/\s+/g, '-').toLowerCase()}`);
+    if (expandedDay === dayName) {
+        dayCard.classList.remove('day-expanded');
+        expandedDay = null;
+    } else {
+        if (expandedDay) {
+            document.getElementById(`day-${expandedDay.replace(/\s+/g, '-').toLowerCase()}`).classList.remove('day-expanded');
+        }
+        dayCard.classList.add('day-expanded');
+        expandedDay = dayName;
+    }
 }
 
-// Add/Edit Period
-document.getElementById('addPeriodBtn').addEventListener('click', () => {
-    openPeriodForm();
+// Toggle day
+async function toggleDay(dayName, enabled) {
+    if (isExamMode && dayName !== 'Special Day' && enabled) {
+        alert('Cannot enable regular days in Exam mode. Disable Special Day first.');
+        document.querySelector(`#day-${dayName.replace(/\s+/g, '-').toLowerCase()} input[type="checkbox"]`).checked = false;
+        return;
+    }
+    // Update backend
+    const result = await apiCall('toggleDay', 'POST', { day: dayName, enabled: enabled });
+    if (result.success) {
+        // Update local state
+        daysSchedule[dayName].enabled = enabled;
+        if (dayName === 'Special Day' && enabled) {
+            isExamMode = true;
+            Object.keys(daysSchedule).forEach(d => {
+                if (d !== 'Special Day') {
+                    daysSchedule[d].enabled = false;
+                    updateDayCard(d);
+                }
+            });
+            daysSchedule['Special Day'].enabled = true;
+            updateDayCard('Special Day');
+        } else if (dayName === 'Special Day' && !enabled) {
+            isExamMode = false;
+            daysSchedule['Special Day'].enabled = false;
+            updateDayCard('Special Day');
+        } else {
+            updateDayCard(dayName);
+        }
+        // Update mode selector
+        document.querySelector('input[name="scheduleMode"][value="exam"]').checked = isExamMode;
+        document.querySelector('input[name="scheduleMode"][value="regular"]').checked = !isExamMode;
+    } else {
+        alert('Failed to toggle day.');
+    }
+}
+
+// Update day card in UI
+function updateDayCard(dayName) {
+    const dayCard = document.getElementById(`day-${dayName.replace(/\s+/g, '-').toLowerCase()}`);
+    const newDayCard = createDayCard(dayName);
+    if (dayCard.classList.contains('day-expanded')) {
+        newDayCard.classList.add('day-expanded');
+    }
+    dayCard.replaceWith(newDayCard);
+    updatePeriodsCount();
+    calculateNextBell();
+}
+
+// Open add period modal
+function openAddPeriodModal(dayName) {
+    document.getElementById('addPeriodModal').style.display = 'flex';
+    document.getElementById('selectedDay').value = dayName;
+    document.getElementById('periodDay').value = dayName;
+}
+
+// Close modal
+document.querySelectorAll('.close, .cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('addPeriodModal').style.display = 'none';
+        document.getElementById('periodForm').reset();
+    });
 });
 
-function openPeriodForm(periodId = '', name = '', from = '', to = '', bellDuration = 3) {
-    document.getElementById('periodFormTitle').textContent = periodId ? 'Edit Period' : 'Add Period';
-    document.getElementById('periodId').value = periodId;
-    document.getElementById('currentDay').value = currentDay;
-    document.getElementById('periodName').value = name;
-    document.getElementById('periodFrom').value = from;
-    document.getElementById('periodTo').value = to;
-    document.getElementById('bellDuration').value = bellDuration;
-    document.getElementById('periodFormModal').style.display = 'flex';
-}
+// Save period (add)
+document.getElementById('periodForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const dayName = document.getElementById('periodDay').value;
+    const name = document.getElementById('periodName').value;
+    const startTime = document.getElementById('startTime').value;
+    const endTime = document.getElementById('endTime').value;
+    const bellDuration = parseInt(document.getElementById('bellDuration').value);
 
-function closePeriodForm() {
-    document.getElementById('periodFormModal').style.display = 'none';
-}
-
-function editPeriod(periodId, name, from, to, bellDuration) {
-    openPeriodForm(periodId, name, from, to, bellDuration);
-}
-
-async function savePeriod(event) {
-    event.preventDefault();
-
-    const periodId = document.getElementById('periodId').value;
-    const dayName = document.getElementById('currentDay').value;
-    const periodData = {
-        name: document.getElementById('periodName').value,
-        from: document.getElementById('periodFrom').value,
-        to: document.getElementById('periodTo').value,
-        bellDuration: parseInt(document.getElementById('bellDuration').value)
-    };
-
-    const action = periodId ? 'updatePeriod' : 'addPeriod';
-    const body = {
-        action: action,
-        email: currentUser.email,
-        dayName: dayName,
-        periodData: periodData
-    };
-
-    if (periodId) {
-        body.periodId = periodId;
-    }
-
-    try {
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body)
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            closePeriodForm();
-            await loadPeriods(dayName);
-        } else {
-            alert('Failed to save period: ' + (data.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Failed to save period:', error);
-        alert('Failed to save period. Please check your connection.');
-    }
-}
-
-async function deletePeriod(periodId) {
-    if (!confirm('Are you sure you want to delete this period?')) {
+    if (startTime >= endTime) {
+        alert('End time must be after start time.');
         return;
     }
 
-    try {
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'deletePeriod',
-                email: currentUser.email,
-                dayName: currentDay,
-                periodId: periodId
-            })
-        });
+    const result = await apiCall('addPeriod', 'POST', {
+        day: dayName,
+        name: name,
+        startTime: startTime,
+        endTime: endTime,
+        bellDuration: bellDuration
+    });
 
-        const data = await response.json();
-        if (data.success) {
-            await loadPeriods(currentDay);
-        } else {
-            alert('Failed to delete period: ' + (data.error || 'Unknown error'));
+    if (result.success) {
+        // Refresh data for that day
+        const dayRes = await apiCall('getDay', 'GET', null, { day: dayName });
+        if (dayRes.success) {
+            daysSchedule[dayName].periods = dayRes.periods;
+            updateDayCard(dayName);
         }
-    } catch (error) {
-        console.error('Failed to delete period:', error);
-        alert('Failed to delete period. Please check your connection.');
+        document.getElementById('addPeriodModal').style.display = 'none';
+        document.getElementById('periodForm').reset();
+    } else {
+        alert('Failed to add period.');
+    }
+});
+
+// Delete period
+async function deletePeriod(dayName, periodId) {
+    if (!confirm('Are you sure you want to delete this period?')) return;
+    const result = await apiCall('deletePeriod', 'POST', { day: dayName, periodId: periodId });
+    if (result.success) {
+        daysSchedule[dayName].periods = daysSchedule[dayName].periods.filter(p => p.periodId !== periodId);
+        updateDayCard(dayName);
+    } else {
+        alert('Failed to delete period.');
     }
 }
 
-// Close modals when clicking outside
-window.onclick = function (event) {
-    const periodModal = document.getElementById('periodModal');
-    const periodFormModal = document.getElementById('periodFormModal');
+// Manual ring (not implemented here; could be added later)
 
-    if (event.target === periodModal) {
-        closePeriodModal();
-    }
-    if (event.target === periodFormModal) {
-        closePeriodForm();
-    }
+// Update clock
+function updateCurrentTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
+setInterval(updateCurrentTime, 1000);
+updateCurrentTime();
+
+// PWA install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show custom prompt after a delay
+    setTimeout(() => {
+        if (!localStorage.getItem('pwaPromptShown')) {
+            document.getElementById('pwaInstallPrompt').style.display = 'flex';
+            localStorage.setItem('pwaPromptShown', 'true');
+        }
+    }, 2000);
+});
+
+document.getElementById('installPwaBtn').addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            deferredPrompt = null;
+        }
+        document.getElementById('pwaInstallPrompt').style.display = 'none';
+    }
+});
+
+document.getElementById('closePwaPrompt').addEventListener('click', () => {
+    document.getElementById('pwaInstallPrompt').style.display = 'none';
+});
+
+document.getElementById('laterBtn').addEventListener('click', () => {
+    document.getElementById('pwaInstallPrompt').style.display = 'none';
+});
+
+// Init
+window.onload = () => {
+    initGoogleAuth();
+    // Check if already logged in (e.g., after page reload)
+    const token = localStorage.getItem('idToken');
+    if (token) {
+        // You could verify token validity here
+    }
+};

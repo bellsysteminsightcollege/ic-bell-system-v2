@@ -2,116 +2,280 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#4CAF50">
+
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="Automated Bell System">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>School Bell System - Dashboard</title>
-    <link rel="manifest" href="manifest.json">
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <meta name="apple-mobile-web-app-title" content="BellSystem">
+    <meta name="description" content="Automated Bell System Management">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    <meta name="msapplication-TileColor" content="#3a0ca3">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="theme-color" content="#3a0ca3">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+    <link rel="apple-touch-icon" sizes="152x152"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+    <link rel="apple-touch-icon" sizes="180x180"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+    <link rel="apple-touch-icon" sizes="167x167"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+    <link rel="icon" type="image/png" sizes="16x16"
+        href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png">
+    <link rel="shortcut icon" href="https://res.cloudinary.com/dwv5eykov/image/upload/v1768909518/favicon_mluyiy.ico">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated Bell Management Admin Dashboard | Designed by Aaqib's DevDesk</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-container">
-            <div class="login-logo">
-                <i class="ri-bell-ringing-line"></i>
+
+    <!-- PWA Installation Prompt -->
+    <div id="pwaInstallPrompt" class="pwa-prompt">
+        <div class="pwa-prompt-content">
+            <div class="pwa-prompt-header">
+                <div class="pwa-icon">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <h2>Install Bell Management Admin Dashboard</h2>
+                <button class="pwa-close-btn" id="closePwaPrompt">&times;</button>
             </div>
-            <h1>School Bell System</h1>
-            <p>Sign in to manage your school bell schedules</p>
-            <button id="googleSignIn" class="google-btn">
-                <i class="ri-google-fill"></i>
-                Sign in with Google
-            </button>
-            <div id="loginError" class="error-message"></div>
+            <div class="pwa-prompt-body">
+                <p>Install the Bell Management Admin Dashboard as a standalone app for quick access and better
+                    experience.</p>
+                <div class="pwa-features">
+                    <div class="feature">
+                        <i class="fas fa-rocket"></i>
+                        <span>Faster Access</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-desktop"></i>
+                        <span>Standalone App</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Launch</span>
+                    </div>
+                </div>
+                <div class="pwa-app-info">
+                    <img src="https://res.cloudinary.com/dwv5eykov/image/upload/v1768908595/app_icon_ftwi7s.png"
+                        alt="App Icon" class="app-icon">
+                    <div class="app-details">
+                        <h3>Automated Bell Management Admin Dashboard</h3>
+                        <p>Manage bell schedules and special Schedules easily</p>
+                    </div>
+                </div>
+            </div>
+            <div class="pwa-prompt-footer">
+                <button class="btn btn-secondary" id="laterBtn">Maybe Later</button>
+                <button class="btn btn-primary" id="installPwaBtn">
+                    <i class="fas fa-download"></i> Install App
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Main Dashboard -->
-    <div id="dashboard" class="dashboard" style="display: none;">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-left">
-                <h1><i class="ri-bell-ringing-line"></i> Bell System</h1>
-            </div>
-            <div class="header-right">
-                <span id="userEmail" class="user-email"></span>
-                <button id="logoutBtn" class="logout-btn">
-                    <i class="ri-logout-box-r-line"></i> Logout
-                </button>
-            </div>
-        </header>
+    <!-- PWA Redirect Notice -->
+    <div id="pwaRedirectNotice" class="pwa-redirect">
+        <div class="redirect-content">
+            <i class="fas fa-external-link-alt"></i>
+            <p>Opening in installed app...</p>
+        </div>
+    </div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <div class="days-grid" id="daysGrid">
-                <!-- Day cards will be inserted here -->
-            </div>
-        </main>
-
-        <!-- Period Modal -->
-        <div id="periodModal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 id="modalTitle">Periods</h2>
-                    <button class="close-modal" onclick="closePeriodModal()">
-                        <i class="ri-close-line"></i>
-                    </button>
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen">
+            <div class="login-container">
+                <div class="logo">
+                    <i class="fas fa-bell"></i>
+                    <h1>Bell System Dashboard</h1>
+                    <p>Developed & Designed by <strong>Aaqib's DevDesk</strong></p>
                 </div>
-                <div class="modal-body">
-                    <div class="period-actions">
-                        <button id="addPeriodBtn" class="add-btn">
-                            <i class="ri-add-line"></i> Add Period
-                        </button>
-                    </div>
-                    <div id="periodsList" class="periods-list">
-                        <!-- Periods will be loaded here -->
-                    </div>
+                <div class="login-box">
+                    <h2>User Login</h2>
+                    <p>Please login with your Google Account to manage bell schedules</p>
+                    <button id="googleLoginBtn" class="btn google-btn">
+                        <i class="fab fa-google"></i> Sign in with Google
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Add/Edit Period Modal -->
-        <div id="periodFormModal" class="modal">
+        <!-- Main Dashboard (Hidden by default) -->
+        <div id="dashboard" class="screen" style="display: none;">
+            <header>
+                <div class="header-left">
+                    <h1><i class="fas fa-bell"></i> Automated Bell System</h1>
+                    <div class="status">
+                        <span class="status-dot online"></span>
+                        <span id="connectionStatus">Connected</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button id="logoutBtn" class="btn logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                    <div class="current-time" id="currentTime"></div>
+                </div>
+            </header>
+
+            <main>
+                <div class="dashboard-grid">
+                    <!-- Schedule Management -->
+                    <div class="card schedule-card">
+                        <div class="card-header">
+                            <h2><i class="fas fa-calendar-alt"></i> Weekly Bell Schedule</h2>
+                            <div class="header-actions">
+                                <button id="toggleAllBtn" class="btn toggle-btn">
+                                    <i class="fas fa-toggle-on"></i> Toggle All
+                                </button>
+                                <button id="clearAllBtn" class="btn clear-btn">
+                                    <i class="fas fa-trash-alt"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="schedule-controls">
+                                <div class="mode-selector">
+                                    <label class="mode-option">
+                                        <input type="radio" name="scheduleMode" value="regular" checked>
+                                        <span>Regular Schedule</span>
+                                    </label>
+                                    <label class="mode-option">
+                                        <input type="radio" name="scheduleMode" value="exam">
+                                        <span>Exam Schedule</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="schedule-list" id="scheduleList">
+                                <!-- Days will be added dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Controls -->
+                    <div class="card controls-card">
+                        <div class="card-header">
+                            <h2><i class="fas fa-sliders-h"></i> Manual Control</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="control-group">
+                                <label for="manualDuration">Ring Duration (s)</label>
+                                <input type="number" id="manualDuration" min="1" max="10" value="5">
+                            </div>
+                            <button id="ringNowBtn" class="btn ring-btn">
+                                <i class="fas fa-play"></i> Ring Bell Now
+                            </button>
+                            <div class="last-rang">
+                                <h3>Last Bell Rang:</h3>
+                                <p id="lastBellTime">No bells rung yet</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Status -->
+                    <div class="card status-card">
+                        <div class="card-header">
+                            <h2><i class="fas fa-info-circle"></i> System Status</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-item">
+                                <span class="status-label">WiFi Status:</span>
+                                <span class="status-value" id="wifiStatus">Connected</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">MQTT Status:</span>
+                                <span class="status-value" id="mqttStatus">Connected</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Next Bell:</span>
+                                <span class="status-value" id="nextBellTime">Loading...</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Periods Today:</span>
+                                <span class="status-value" id="periodsCount">0</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Processor:</span>
+                                <span class="status-value">ESP32 by Expressif</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Add Period Modal -->
+        <div id="addPeriodModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="periodFormTitle">Add Period</h2>
-                    <button class="close-modal" onclick="closePeriodForm()">
-                        <i class="ri-close-line"></i>
-                    </button>
+                    <h2><i class="fas fa-plus-circle"></i> Add New Period</h2>
+                    <span class="close">&times;</span>
                 </div>
                 <div class="modal-body">
-                    <form id="periodForm" onsubmit="savePeriod(event)">
-                        <input type="hidden" id="periodId">
-                        <input type="hidden" id="currentDay">
+                    <form id="periodForm">
+                        <input type="hidden" id="selectedDay">
+                        <div class="form-group">
+                            <label for="periodDay">Day</label>
+                            <select id="periodDay" required>
+                                <option value="">Select a day</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                                <option value="Exam Day">Special Schedule</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="periodName">Period Name</label>
-                            <input type="text" id="periodName" required>
+                            <input type="text" id="periodName" placeholder="e.g., Assembly, 1st Period">
                         </div>
-                        <div class="form-group">
-                            <label for="periodFrom">From Time</label>
-                            <input type="time" id="periodFrom" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="periodTo">To Time</label>
-                            <input type="time" id="periodTo" required>
+                        <div class="time-group">
+                            <div class="form-group">
+                                <label for="startTime">Start Time</label>
+                                <input type="time" id="startTime" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="endTime">End Time</label>
+                                <input type="time" id="endTime" required>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="bellDuration">Bell Duration (seconds)</label>
-                            <input type="number" id="bellDuration" min="1" max="30" value="3" required>
+                            <input type="number" id="bellDuration" min="1" max="10" value="3" required>
                         </div>
                         <div class="form-actions">
-                            <button type="button" class="cancel-btn" onclick="closePeriodForm()">Cancel</button>
-                            <button type="submit" class="save-btn">Save Period</button>
+                            <button type="button" class="btn cancel-btn">Cancel</button>
+                            <button type="submit" class="btn save-btn">Add Period</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+
     <script src="app.js"></script>
 </body>
 
